@@ -12,7 +12,8 @@ import org.apache.http.protocol.HttpContext;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.stream.Collectors;
+//import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 public class AWSSigningRequestInterceptor implements HttpRequestInterceptor {
 
@@ -70,26 +71,40 @@ public class AWSSigningRequestInterceptor implements HttpRequestInterceptor {
         return headers.build();
     }
 
-    private Optional<byte[]> body(HttpRequest request) throws IOException {
+    private byte[] body(HttpRequest request) throws IOException {
         final HttpRequest original = ((HttpRequestWrapper) request).getOriginal();
         if (! HttpEntityEnclosingRequest.class.isAssignableFrom(original.getClass())) {
-            return Optional.absent();
+            //return Optional.absent();
+            return null;
         }
-        return Optional.fromNullable(((HttpEntityEnclosingRequest) original).getEntity()).transform(TO_BYTE_ARRAY);
+        //return Optional.fromNullable(((HttpEntityEnclosingRequest) original).getEntity()).transform(TO_BYTE_ARRAY);
+        final HttpEntity entity = ((HttpEntityEnclosingRequest) original).getEntity();
+        try { 
+            return ByteStreams.toByteArray(entity.getContent());
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     private Header[] headers(Map<String, Object> from) {
-        return from.entrySet().stream()
+        Header[] result = new Header[from.size()];
+        ArrayList<Header> result_list = new ArrayList<Header>();
+            for (Map.Entry<String, Object> entry : from.entrySet()) {
+            result_list.add(new BasicHeader(entry.getKey(), entry.getValue().toString()));
+        }
+        /*return from.entrySet().stream()
                 .map(entry -> new BasicHeader(entry.getKey(), entry.getValue().toString()))
                 .collect(Collectors.toList())
-                .toArray(new Header[from.size()]);
+                .toArray(new Header[from.size()]);*/
+        result_list.toArray(result);
+        return result;
     }
 
-    private static final Function<HttpEntity, byte[]> TO_BYTE_ARRAY = entity -> {
+    /*private static final Function<HttpEntity, byte[]> TO_BYTE_ARRAY = entity -> {
         try {
             return ByteStreams.toByteArray(entity.getContent());
         } catch (IOException e) {
             throw Throwables.propagate(e);
         }
-    };
+    };*/
 }

@@ -17,13 +17,17 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+/*import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoField;*/
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
+import org.joda.time.format.DateTimeFormatterBuilder;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
+import org.joda.time.LocalDateTime;
 
 /**
  * Inspired By: http://pokusak.blogspot.co.uk/2015/10/aws-elasticsearch-request-signing.html
@@ -46,7 +50,7 @@ public class AWSSigner {
     private static final Joiner JOINER = Joiner.on(';');
     private static final String CONNECTION = "connection";
     private static final String CLOSE = ":close";
-    private static final DateTimeFormatter BASIC_TIME_FORMAT = new DateTimeFormatterBuilder()
+    /*private static final DateTimeFormatter BASIC_TIME_FORMAT = new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .appendValue(ChronoField.YEAR, 4)
             .appendValue(ChronoField.MONTH_OF_YEAR, 2)
@@ -56,7 +60,17 @@ public class AWSSigner {
             .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
             .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
             .appendLiteral('Z')
-            .toFormatter();
+            .toFormatter();*/
+    private static final DateTimeFormatter BASIC_TIME_FORMAT = new DateTimeFormatterBuilder()
+            .appendYear(4,4)
+            .appendMonthOfYear(2)
+            .appendDayOfMonth(2)
+            .appendLiteral("T")
+            .appendHourOfDay(2)
+            .appendMinuteOfHour(2)
+            .appendSecondOfMinute(2)
+            .appendLiteral('Z')
+            .toFormatter();  
     private static final String EMPTY = "";
     private static final String ZERO = "0";
     private static final Joiner AMPERSAND_JOINER = Joiner.on('&');
@@ -69,29 +83,37 @@ public class AWSSigner {
     private final AWSCredentialsProvider credentialsProvider;
     private final String region;
     private final String service;
-    private final Supplier<LocalDateTime> clock;
+    private final CurrentTimeProvider clock;
+
+    public interface CurrentTimeProvider {
+        public abstract LocalDateTime getTime();
+    }
 
     public AWSSigner(AWSCredentialsProvider credentialsProvider,
                      String region,
                      String service,
-                     Supplier<LocalDateTime> clock) {
+                     CurrentTimeProvider clock) {
         this.credentialsProvider = credentialsProvider;
         this.region = region;
         this.service = service;
         this.clock = clock;
     }
 
+    private byte[] getPayloadHash(byte[] payload) {
+        if (payload == null) { return hash(EMPTY.getBytes(Charsets.UTF_8)); } else { return hash(payload); }
+    }
+
     public Map<String, Object> getSignedHeaders(String uri,
                                                 String method,
                                                 Multimap<String, String> queryParams,
                                                 Map<String, Object> headers,
-                                                Optional<byte[]> payload) {
-        final LocalDateTime now = clock.get();
+                                                byte[] payload) {
+        final LocalDateTime now = clock.getTime();
         final AWSCredentials credentials = credentialsProvider.getCredentials();
         final Map<String, Object> result = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         result.putAll(headers);
         if (!result.containsKey(DATE)) {
-            result.put(X_AMZ_DATE, now.format(BASIC_TIME_FORMAT));
+            result.put(X_AMZ_DATE, BASIC_TIME_FORMAT.print(now));
         }
         if (AWSSessionCredentials.class.isAssignableFrom(credentials.getClass())) {
             result.put(SESSION_TOKEN, ((AWSSessionCredentials) credentials).getSessionToken());
@@ -111,7 +133,7 @@ public class AWSSigner {
                 queryParamsString(queryParams) + RETURN +
                 headersString.toString() + RETURN +
                 signedHeaderKeys + RETURN +
-                toBase16(hash(payload.or(EMPTY.getBytes(Charsets.UTF_8))));
+                toBase16(getPayloadHash(payload));
         final String stringToSign = createStringToSign(canonicalRequest, now);
         final String signature = sign(stringToSign, now, credentials);
         final String autorizationHeader = AWS4_HMAC_SHA256_CREDENTIAL + credentials.getAWSAccessKeyId() + SLASH + getCredentialScope(now) +
@@ -150,13 +172,13 @@ public class AWSSigner {
 
     private String createStringToSign(String canonicalRequest, LocalDateTime now) {
         return AWS4_HMAC_SHA256 +
-                now.format(BASIC_TIME_FORMAT) + RETURN +
+                BASIC_TIME_FORMAT.print(now) + RETURN +
                 getCredentialScope(now) + RETURN +
                 toBase16(hash(canonicalRequest.getBytes(Charsets.UTF_8)));
     }
 
     private String getCredentialScope(LocalDateTime now) {
-        return now.format(DateTimeFormatter.BASIC_ISO_DATE) + SLASH + region + SLASH + service + AWS4_REQUEST;
+        return ISODateTimeFormat.basicDate().print(now) + SLASH + region + SLASH + service + AWS4_REQUEST;
     }
 
     private byte[] hash(byte[] payload) {
@@ -180,7 +202,7 @@ public class AWSSigner {
 
     private byte[] getSignatureKey(LocalDateTime now, AWSCredentials credentials) {
         final byte[] kSecret = (AWS4 + credentials.getAWSSecretKey()).getBytes(Charsets.UTF_8);
-        final byte[] kDate = hmacSHA256(now.format(DateTimeFormatter.BASIC_ISO_DATE), kSecret);
+        final byte[] kDate = hmacSHA256(ISODateTimeFormat.basicDate().print(now), kSecret);
         final byte[] kRegion = hmacSHA256(region, kDate);
         final byte[] kService = hmacSHA256(service, kRegion);
         return hmacSHA256(AWS_4_REQUEST, kService);

@@ -13,7 +13,7 @@ import com.google.common.collect.Multimap;
 import org.junit.Test;
 import vc.inreach.aws.request.AWSSigner;
 
-import java.time.LocalDateTime;
+import org.joda.time.LocalDateTime;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -31,6 +31,14 @@ public class AWSSignerTest {
      *
      * @throws Exception
      */
+    private class TestCurrentTimeProvider implements AWSSigner.CurrentTimeProvider {
+        public LocalDateTime getTime()
+        {
+            //return LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+            return new LocalDateTime(2011, 9, 9, 23, 36, 0);
+        } 
+    }
+
     @Test
     public void testGetVanilla() throws Exception {
         // GIVEN
@@ -43,7 +51,7 @@ public class AWSSignerTest {
         String service = "host";
 
         // Date
-        Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        AWSSigner.CurrentTimeProvider clock = new TestCurrentTimeProvider();
         // weird date : 09 Sep 2011 is a friday, not a monday
         String date = "Mon, 09 Sep 2011 23:36:00 GMT";
 
@@ -57,7 +65,7 @@ public class AWSSignerTest {
                 .put("Date", date)
                 .put("Host", host)
                 .build();
-        Optional<byte[]> payload = Optional.absent();
+        byte[] payload = null;
 
         // WHEN
         // The request is signed
@@ -105,7 +113,8 @@ public class AWSSignerTest {
         String service = "host";
 
         // Date
-        Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        //Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        AWSSigner.CurrentTimeProvider clock = new TestCurrentTimeProvider();
         // weird date : 09 Sep 2011 is a friday, not a monday
         String date = "Mon, 09 Sep 2011 23:36:00 GMT";
 
@@ -120,7 +129,7 @@ public class AWSSignerTest {
                 .put("Date", date)
                 .put("Host", host)
                 .build();
-        Optional<byte[]> payload = Optional.absent();
+        byte[] payload = null;
 
         // WHEN
         // The request is signed
@@ -158,7 +167,8 @@ public class AWSSignerTest {
         String service = "host";
 
         // Date
-        Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        //Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        AWSSigner.CurrentTimeProvider clock = new TestCurrentTimeProvider();
         // weird date : 09 Sep 2011 is a friday, not a monday
         String date = "20110909T233600Z";
 
@@ -171,7 +181,7 @@ public class AWSSignerTest {
         Map<String, Object> headers = ImmutableMap.<String, Object>builder()
                 .put("Host", host)
                 .build();
-        Optional<byte[]> payload = Optional.absent();
+        byte[] payload = null;
 
         // WHEN
         // The request is signed
@@ -210,7 +220,8 @@ public class AWSSignerTest {
         String service = "host";
 
         // Date
-        Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        //Supplier<LocalDateTime> clock = () -> LocalDateTime.of(2011, 9, 9, 23, 36, 0);
+        AWSSigner.CurrentTimeProvider clock = new TestCurrentTimeProvider();
         // weird date : 09 Sep 2011 is a friday, not a monday
         String date = "Mon, 09 Sep 2011 23:36:00 GMT";
 
@@ -224,7 +235,7 @@ public class AWSSignerTest {
                 .put("Date", date)
                 .put("Host", host)
                 .build();
-        Optional<byte[]> payload = Optional.absent();
+        byte[] payload = null;
 
         // WHEN
         // The request is signed
